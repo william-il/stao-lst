@@ -168,3 +168,12 @@ btcli wallet overview --wallet.name validator --subtensor.chain_endpoint ws://12
 btcli wallet overview --wallet.name miner --subtensor.chain_endpoint ws://127.0.0.1:9946
 ```
 
+to do list:
+- refactor code
+- implement multiple delegate staking and unstaking
+- organize code, separate functions
+- document backend
+- document smart contract
+- create script to build subnets, validators and delgates quickly
+- fix privately revealed wallet data
+- generate wallet data script
