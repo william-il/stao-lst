@@ -1,5 +1,5 @@
 import sTAOArtifact from '../../../artifacts/contracts/sTAO.sol/sTAO.json';
-import data from '../deployment-info.json';
+import data from '../deploymentData/deployment-info.json';
 import dotenv from 'dotenv';
 dotenv.config();
 

@@ -1,4 +1,4 @@
-const {artifacts, network,ethers, upgrades} = require("hardhat"); 
+const {artifacts, network, ethers, upgrades} = require("hardhat"); 
 const fs = require("fs");
 const path = require("path");
 require("dotenv").config();
@@ -24,6 +24,9 @@ async function main() {
   ] = await ethers.getSigners();
  // console.log(sTaoPauser);
   
+
+
+ 
   const [
     deployerPK,
     sTaoPauserPK,
@@ -36,7 +39,9 @@ async function main() {
     "0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a",
     "0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6",
     "0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a"]
-  
+    
+
+
   console.log(
     "sTao role addresses: ",
     "\n Deployer/Default Admin: ",
@@ -142,7 +147,8 @@ async function main() {
     timestamp: new Date().toISOString()
   };
 
-  const deploymentFile = path.join(__dirname, '..', 'backend', 'src', 'deployment-info.json');
+  const deploymentFile = path.join(__dirname, '..', 'backend', 'src', 'deploymentData','deployment-info.json');
+  ensureDirectoryExistence(deploymentFile);
   fs.writeFileSync(deploymentFile, JSON.stringify(deploymentInfo, null, 2));
   console.log("Deployment info saved to:", deploymentFile);
 
@@ -159,7 +165,8 @@ async function main() {
 
   const abi = JSON.stringify(STao.interface.format('json'), null, 2);
   
-  const abiPath = path.join(__dirname, "..", "backend", "src", 'STaoHumanReadableABI.json');
+  const abiPath = path.join(__dirname, "..", "backend", "src", 'deploymentData', 'STaoHumanReadableABI.json');
+  ensureDirectoryExistence(abiPath);
   fs.writeFileSync(abiPath, abi);
 
   console.log(`ABI written to ${abiPath}`);
@@ -196,3 +203,12 @@ main().catch((error) => {
   console.error(error);
   process.exitCode = 1;
 });
+
+function ensureDirectoryExistence(filePath) {
+  const dirname = path.dirname(filePath);
+  if (fs.existsSync(dirname)) {
+    return true;
+  }
+  fs.mkdirSync(dirname, { recursive: true });
+}
+
