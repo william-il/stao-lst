@@ -19,6 +19,13 @@ npx hardhat run scripts/deployUUPS.js --network localhost
 ```
 ---
 
+## Run the Bittensor Processor
+Assuming the bittensor side is already setup, run the backend processor.
+
+```shell
+npx tsx backend/src/index.ts
+```
+
 ## Bittensor setup
 On deployment, check the terminal running the hardhat node to check if it properly deployed. Some json files should have also been generated in the backend files.  
 Next, inorder to test the capabilities of the contract and the processor, set up a subnet and some miners and validators. Also set one of the validators to be a delegate.  
