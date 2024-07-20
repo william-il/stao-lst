@@ -14,6 +14,7 @@ import { Keyring } from '@polkadot/keyring';
 
 async function main() {
     const wsProviderTemp = new WsProvider(process.env.BITTENSOR_WS_PROVIDER);
+    console.log(process.env.BITTENSOR_WS_PROVIDER);
     const apiTemp = await ApiPromise.create({ provider: wsProviderTemp });
     let keyringTemp = new Keyring({ type: 'sr25519' });
 
@@ -31,7 +32,10 @@ async function main() {
     const keyringPairs = keyringUtils.keyringPairs;
     const keyringAddress = keyringUtils.keyringAddresses;
     const etherWallets = ethersClass.signers;
-
+    const key = keyringTemp.addFromUri('//Owner');
+    console.log(key.address);
+}
+/*
     console.log('\n Creating some eth keys....');
 
     let ethKeys: { taoWallet: string; address: string; signature: string }[] =
@@ -62,7 +66,8 @@ async function main() {
     ).data.free.toBigInt();
     console.log(taoInColdKey);
 
-    /*823 902
+    */
+/*823 902
        823 902 567 941 101n
 42 100 975 651 937 187 453n
     if (ethKeys.length) {
@@ -87,7 +92,7 @@ async function main() {
     }
     */
 
-    /*
+/*
     console.log(await ethersClass.provider.getBalance(etherWallets[0].address));
     const tao1Mapping = await ethersClass.retrieveEthKeyAccount(
         ethKeys[0].taoWallet
@@ -103,11 +108,10 @@ async function main() {
     );
     console.log(ethKeys[0].taoWallet);
 */
-    // lets create some tao accounts
-    // the mapping looks like this:
-    // taoAddress => [{ethAddress, signature of signed ethAddress}]
-    // so this means we must have a string version of:
-    // tao address, eth address, and the signature of the eth address.
-}
+// lets create some tao accounts
+// the mapping looks like this:
+// taoAddress => [{ethAddress, signature of signed ethAddress}]
+// so this means we must have a string version of:
+// tao address, eth address, and the signature of the eth address.
 
 main();

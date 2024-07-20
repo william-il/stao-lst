@@ -7,10 +7,11 @@ import BittensorTestUtils from './processors/BittensorTestUtils';
 import EthersTestUtils from './processors/EthersTestUtils';
 import IntegratedSystem from './processors/IntegratedSystem';
 import dotenv from 'dotenv';
+import * as path from 'path';
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
-dotenv.config();
 async function main() {
-    const tempWsProvider = new WsProvider('ws://localhost:9945');
+    const tempWsProvider = new WsProvider(process.env.BITTENSOR_WS_PROVIDER);
     const tempApi = await ApiPromise.create({ provider: tempWsProvider });
     const tempKeyring = new Keyring({ type: 'sr25519' });
 

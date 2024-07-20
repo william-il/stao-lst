@@ -5,7 +5,6 @@ pragma solidity ^0.8.24;
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-//import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {ERC20PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PausableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
@@ -20,23 +19,6 @@ contract sTAO is
     UUPSUpgradeable,
     ReentrancyGuardUpgradeable
 {
-    /*
-     * ADDRS
-     * 0x5B38Da6a701c568545dCfcB03FcB875f56beddC4 admin upgrader
-     * 0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2 pauser
-     * 0x4B20993Bc481177ec7E8f571ceCaE8A9e22C02db minter pool&*tax
-     * 0x78731D3Ca6b7E34aC0F824c42a7cC18A495cabaB vault
-     * 0 tax  0x0f3675dcbb04499f4591cf48a7628dbc749eb3eec89667918130c01f5db73e08
-     * 100 %  10,000,000,000,000,000,000
-     * 0 decimals
-     * 0x617F2E2fD72FD9D5503197092aC168c91465E7f2 user account
-     * 0x17F6AD8Ef982297579C203069C1DbfFE4348c372
-     * 0x5c6B0f7Bf3E7ce046039Bd8FABdfD3f9F5021678
-     * sig 0x4ee685ab8551be7fa05455e7c5e13df5ee0f1d17cbdd5ef39a240c3b643d9e320c134eea6cd27f94b75b2fbd6ece3aead69f34517ecf3da0376412c2e67be582
-     * bittensor 5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty
-     *
-     */
-
     /*
      ****************************************************************************
      * Storage variables, mappings and structures

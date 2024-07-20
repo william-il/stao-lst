@@ -6,21 +6,11 @@ import { signatureVerify } from '@polkadot/util-crypto';
 import dotenv from 'dotenv';
 import '../interfaces/augment-api';
 import * as path from 'path';
+
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
-export function generateKeyrings(keyring: Keyring) {
-  keyring.addFromUri('//Alice');
-  keyring.addFromUri('//Bob');
-  keyring.addFromUri('//Charlie');
-  keyring.addFromUri('//Dave');
-  keyring.addFromUri('//Eve');
+function main() {
+    console.log(process.env.BITTENSOR_WS_PROVIDER);
 }
 
-export function generateNewKeyrings(
-  keyring: Keyring,
-  numberOfKeyrings: number
-) {
-  for (let i = 0; i < numberOfKeyrings; i++) {
-    keyring.addFromUri('//Alice');
-  }
-}
+main();

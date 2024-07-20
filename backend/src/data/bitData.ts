@@ -5,8 +5,8 @@ import { stringToU8a, u8aToHex } from '@polkadot/util';
 import { signatureVerify } from '@polkadot/util-crypto';
 import dotenv from 'dotenv';
 import '../interfaces/augment-api';
-
-dotenv.config();
+import * as path from 'path';
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const testKeyring = new Keyring({ type: 'sr25519', ss58Format: 13116 });
 export const bittensorData = {
