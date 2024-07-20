@@ -169,6 +169,7 @@ btcli wallet overview --wallet.name miner --subtensor.chain_endpoint ws://127.0.
 ```
 
 to do list:
+- also check if everything works one last time
 - refactor code
 - implement multiple delegate staking and unstaking
 - organize code, separate functions
