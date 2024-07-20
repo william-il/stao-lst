@@ -6,16 +6,16 @@ import batchQueriedEvents from '../utils/etherEventBatcher';
 import { eth } from '@polkadot/types/interfaces/definitions';
 
 async function main() {
-    const ethersClass = new EthersTestUtils();
+  const ethersClass = new EthersTestUtils();
 
-    // First lets do some minting:
-    //console.log('Testing Sigular Mint');
-    console.log(
-        await ethersClass.getSTaoBalance(
-            '0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266'
-        )
-    );
-    /*10,000,000,000,000,000,000
+  // First lets do some minting:
+  //console.log('Testing Sigular Mint');
+  console.log(
+    await ethersClass.getSTaoBalance(
+      '0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266'
+    )
+  );
+  /*10,000,000,000,000,000,000
     console.log(
         'Mint Receipt: ',
         await ethersClass.stakeSTao(BigInt(100e18), 0)
@@ -34,7 +34,7 @@ async function main() {
     console.log('total supply', await ethersClass.contract.totalSupply());
     */
 
-    /*
+  /*
     console.log('Testing Multiple Mint');
 
     console.log(
@@ -100,7 +100,7 @@ async function main() {
         )
     );
     */
-    /*
+  /*
     console.log('Batch Request for Staking');
     const newFilter2 = ethersClass.contract.filters.Transfer();
     console.log(
@@ -112,7 +112,7 @@ async function main() {
         )
     );
     */
-    console.log('Completed Successfully');
+  console.log('Completed Successfully');
 }
 
 main();
