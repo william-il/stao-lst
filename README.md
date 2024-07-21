@@ -28,6 +28,8 @@ First install substrate dependencies
 
 ```shell
 sudo apt update
+```
+```shell
 sudo apt install --assume-yes make build-essential git clang curl libssl-dev llvm libudev-dev protobuf-compiler
 ```
 
@@ -35,6 +37,8 @@ Install rust and cargo
 
 ```shell
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+```shell
 source "$HOME/.cargo/env"
 ```
 
