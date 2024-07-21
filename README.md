@@ -13,7 +13,7 @@ In order to run the hardhat node, and deploy the uups contract properly do the f
 npx hardhat node --network hardhat
 ```
 
-Deploy the contract
+Deploy the contract, note that if you do not run the script with 'hardhat run' and '--network localhost', the contract will still deploy but ethers will have issues extracting contract defined structures.
 ```shell
 npx hardhat run scripts/deployUUPS.js --network localhost
 ```
