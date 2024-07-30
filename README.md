@@ -13,9 +13,66 @@ In order to run the hardhat node, and deploy the uups contract properly do the f
 npx hardhat node --network hardhat
 ```
 
-Deploy the contract
+Deploy the contract, note that if you do not run the script with 'hardhat run' and '--network localhost', the contract will still deploy but ethers will have issues extracting contract defined structures.
 ```shell
 npx hardhat run scripts/deployUUPS.js --network localhost
+```
+---
+
+## Run Subtensor setup
+Within the project directory there is a custom built subtensor chain that will accomodate the higher rate limits of the test environment.  
+To use this subtensor do the followng:  
+
+#### Only do this once, or if you have already done this, skip this section
+First install substrate dependencies
+
+```shell
+sudo apt update
+```
+```shell
+sudo apt install --assume-yes make build-essential git clang curl libssl-dev llvm libudev-dev protobuf-compiler
+```
+
+Install rust and cargo
+
+```shell
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+```shell
+source "$HOME/.cargo/env"
+```
+
+Setup rust
+
+```shell
+./subtensor/scripts/init.sh
+```
+
+#### Do this if this is your first time building the binaries, or if you edit the subtensor
+
+Rebuild the binary
+
+```shell
+cargo build --release --features pow-faucet
+```
+or for fast-block (not recommended)
+```shell
+cargo build --release --features fast-block
+```
+
+Run the localnet script and launch the subtensor chain
+
+```shell
+BUILD_BINARY=0 ./scripts/localnet.sh 
+```
+
+Run the subtensor builder script  
+This script creates validators, miners, subnets, a owner, and adds stake to each validator.
+* --subnet-count or --sc can be between 1 - 8, and defaults to 1
+* --validator-count or --vc can be between 2 - 8, and defaults to 2
+
+```shell
+npx tsx backend/src/setup/setupSubtensor.ts --sc [1-8] --vc [2-8]
 ```
 ---
 
@@ -24,126 +81,6 @@ Assuming the bittensor side is already setup, run the backend processor.
 
 ```shell
 npx tsx backend/src/index.ts
-```
-
-## Bittensor setup
-On deployment, check the terminal running the hardhat node to check if it properly deployed. Some json files should have also been generated in the backend files.  
-Next, inorder to test the capabilities of the contract and the processor, set up a subnet and some miners and validators. Also set one of the validators to be a delegate.  
-
-This is on the staging documentation, but here are the relevant commands:
-
-
-Create an owner
-```shell
-btcli wallet new_coldkey --wallet.name owner
-```
-
-Create a miner
-```shell
-btcli wallet new_coldkey --wallet.name miner
-```
-
-Create a miner hotkey pair
-```shell
-btcli wallet new_hotkey --wallet.name miner --wallet.hotkey default
-```
-
-Create a validator
-```shell
-btcli wallet new_coldkey --wallet.name validator
-```
-
-Create a validator hotkey pair
-```shell
-btcli wallet new_hotkey --wallet.name validator --wallet.hotkey default
-```
----
-
-Either faucet or send tao from a dev account to owner and validator, then create the subnet.
-
-Faucet to owner
-```shell
-btcli wallet faucet --wallet.name owner --subtensor.chain_endpoint ws://127.0.0.1:9946
-```
-
-Faucet to validator
-```shell
-btcli wallet faucet --wallet.name validator --subtensor.chain_endpoint ws://127.0.0.1:9946
-```
-
-Create subnet with owner's balance
-```shell
-btcli subnet create --wallet.name owner --subtensor.chain_endpoint ws://127.0.0.1:9946 
-```
----
-
-Register the miner and the validator to the subnet
-
-```shell
-btcli subnet register --wallet.name miner --wallet.hotkey default --subtensor.chain_endpoint ws://127.0.0.1:9946
-```
-
-```shell
-btcli subnet register --wallet.name validator --wallet.hotkey default --subtensor.chain_endpoint ws://127.0.0.1:9946
-```
----
-
-Add stake to the subnet through the validator.
-
-```shell
-btcli stake add --wallet.name validator --wallet.hotkey default --subtensor.chain_endpoint ws://127.0.0.1:9946
-```
----
-
-Nominate the validator as a delegate
-
-```shell
-btcli root nominate
-    --wallet.name validator
-    --wallet.hotkey default
-    --subtensor.chain_endpoint ws://127.0.0.1:9946
-```
----
-
-Run the miner and validator
-
-```shell
-python neurons/miner.py 
-    --netuid 1 
-    --subtensor.chain_endpoint ws://127.0.0.1:9946 
-    --wallet.name miner
-    --wallet.hotkey default
-    --logging.debug
-```
-
-```shell
-python neurons/validator.py
-    --netuid 1
-    --subtensor.chain_endpoint ws://127.0.0.1:9946
-    --wallet.name validator
-    --wallet.hotkey default
-    --logging.debug
-```
----
-
-Set   for the subnet
-
-Register the validator to the root subnet
-```shell
-btcli root register
-    --wallet.name validator
-    --wallet.hotkey default
-    --subtensor.chain_endpoint ws://127.0.0.1:9946
-```
-
-Boost your subnet on the root subnet
-```shell
-btcli root boost
-    --netuid 1
-    --increase 1
-    --wallet.name validator
-    --wallet.hotkey default
-    --subtensor.chain_endpoint ws://127.0.0.1:9946
 ```
 ---
 
@@ -161,10 +98,22 @@ btcli subnet list --subtensor.chain_endpoint ws://127.0.0.1:9946
 ```
 
 ```shell
-btcli wallet overview --wallet.name validator --subtensor.chain_endpoint ws://127.0.0.1:9946
+btcli wallet overview --wallet.name [wallet name] --subtensor.chain_endpoint ws://127.0.0.1:9946
 ```
 
 ```shell
-btcli wallet overview --wallet.name miner --subtensor.chain_endpoint ws://127.0.0.1:9946
+btcli wallet overview --wallet.name [wallet name] --subtensor.chain_endpoint ws://127.0.0.1:9946
+```
+
+To see metagraph subnet data
+
+```shell
+btcli s metagraph --subtensor.chain_endpoint ws://127.0.0.1:9946
+```
+
+To see root weights set by validators
+
+```shell
+btcli root get_weights --subtensor.chain_endpoint ws://127.0.0.1:9946
 ```
 
