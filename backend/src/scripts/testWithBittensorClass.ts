@@ -4,33 +4,62 @@ import ethWallets from '../data/testWallets';
 import { stringToU8a, u8aToHex } from '@polkadot/util';
 import bittensorTestWallets from '../data/bittensorTestWallets';
 import { Keyring } from '@polkadot/keyring';
-
+import {
+  cryptoWaitReady,
+  mnemonicGenerate,
+  mnemonicToMiniSecret,
+  randomAsHex,
+} from '@polkadot/util-crypto';
+import dotenv from 'dotenv';
+import * as path from 'path';
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 async function main() {
-    const wsProviderTemp = new WsProvider(process.env.BITTENSOR_WS_PROVIDER);
-    const apiTemp = await ApiPromise.create({ provider: wsProviderTemp });
-    let keyringTemp = new Keyring({ type: 'sr25519' });
+  await cryptoWaitReady();
 
-    const bittensorModule = new BittensorTestUtils(
-        apiTemp,
-        wsProviderTemp,
-        keyringTemp,
-        10
-    );
+  const wsProviderTemp = new WsProvider(process.env.BITTENSOR_WS_PROVIDER);
+  const apiTemp = await ApiPromise.create({ provider: wsProviderTemp });
+  let keyringTemp = new Keyring({ type: 'sr25519' });
 
-    const keyringPairs = bittensorModule.keyring.getPairs();
+  const bittensorModule = new BittensorTestUtils(
+    apiTemp,
+    wsProviderTemp,
+    keyringTemp,
+    false
+  );
 
-    const coldKeys = bittensorTestWallets.map(({ coldkey }) => coldkey);
+  await bittensorModule.setupByFile();
 
-    //console.log(`Subscribing to extrinsics...`);
-    /*
+  await bittensorModule.sendTransactionSecure(
+    bittensorModule.keyringMap.get('Alice')!,
+    bittensorModule.keyringMap.get('Vault')!,
+    BigInt(100000e9)
+  );
+  const vaultKeyring = bittensorModule.keyringMap.get('Vault')!;
+  await bittensorModule.addStakeSecure(
+    vaultKeyring,
+    bittensorModule.hotKeyAddressMap.get('Validator1Hotkey')!,
+    BigInt(10000e9)
+  );
+  console.log(
+    'TOTAL tao staked in vault: ',
+    await bittensorModule.getTotalColdKeyStake(vaultKeyring.address)
+  );
+
+  console.log(
+    'tao staked in validator 1: ',
+    await bittensorModule.getColdKeyStakeForHotkey(
+      vaultKeyring.address,
+      bittensorModule.hotKeyAddressMap.get('Validator1Hotkey')!
+    )
+  );
+
+  //console.log(`Subscribing to extrinsics...`);
+  /*
     const exSub = await bittensorModule.blockSubscriptionToTransferTest(
         keyringPairs[6].address
     );
     */
-    console.log(
-        await bittensorModule.getTransferFee(keyringPairs[0], keyringPairs[1])
-    );
-    /*
+  /*
 
 
     console.log(`Testing Sending a Secure Transaction...`);
@@ -64,7 +93,7 @@ async function main() {
     );
     */
 
-    /*
+  /*
     console.log(
         (await bittensorModule.getSingularBalance(keyringPairs[0])).toHuman()
     );
@@ -72,7 +101,7 @@ async function main() {
         (await bittensorModule.getSingularBalance(keyringPairs[1])).toHuman()
     );
     */
-    /*
+  /*
     console.log(
         (await bittensorModule.api.query.subtensorModule.totalStake()).toHuman()
     );
@@ -100,7 +129,7 @@ async function main() {
     );
     */
 
-    /*
+  /*
     console.log('Testing Bittensor Module, with 10 generated accounts');
 
     console.log(`Subscribing to Alice's account...`);
@@ -212,7 +241,7 @@ async function main() {
     );
     */
 
-    console.log(`Finshed for now`);
+  console.log(`Finshed for now`);
 }
 
 main();

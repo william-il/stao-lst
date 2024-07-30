@@ -10,7 +10,7 @@ import * as path from 'path';
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 function main() {
-    console.log(process.env.BITTENSOR_WS_PROVIDER);
+  console.log(process.env.BITTENSOR_WS_PROVIDER);
 }
 
 main();

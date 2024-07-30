@@ -31,6 +31,8 @@ import { mapToTypeMap } from '@polkadot/types-codec';
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 async function main() {
+  //console.log(process.env.BITTENSOR_WS_PROVIDER);
+  //console.log(process.env.OWNER_SECRET_KEY);
   await cryptoWaitReady();
 
   // parse bittensor arguments
@@ -59,15 +61,49 @@ async function main() {
     );
 
     // Generate keypairs for owner, miner, validators
-    bittensorModule.keyring.addFromUri('//Owner', { name: 'Owner' });
-    bittensorModule.keyring.addFromUri('//Miner', { name: 'Miner' });
-    bittensorModule.keyring.addFromUri('//MinerHotkey', {
-      name: 'MinerHotkey',
+    //console.log(bittensorModule.keyringMap);
+    const mnemonicMap: Map<string, string> = new Map();
+
+    for (const [name, value] of bittensorModule.keyringMap) {
+      console.log(name);
+      if (name === 'Vault') {
+        mnemonicMap.set(name, process.env.VAULT_SECRET_KEY!);
+      } else {
+        mnemonicMap.set(
+          name,
+          `bottom drive obey lake curtain smoke basket hold race lonely fit walk//${name}`
+        );
+      }
+    }
+
+    const ownerMnemonic = process.env.OWNER_SECRET_KEY! + '//Owner';
+    mnemonicMap.set('Owner', ownerMnemonic);
+    bittensorModule.keyring.addFromUri(`${ownerMnemonic}`, {
+      name: 'Owner',
+    });
+    const minerMnemonic = mnemonicGenerate();
+    mnemonicMap.set('Miner', minerMnemonic);
+    bittensorModule.keyring.addFromUri(`${minerMnemonic}`, {
+      name: 'Miner',
+    });
+    const minerHotkeyMnemonic = mnemonicGenerate();
+    mnemonicMap.set('MinerAltKey', minerHotkeyMnemonic);
+    bittensorModule.keyring.addFromUri(`${minerHotkeyMnemonic}`, {
+      name: 'MinerAltKey',
     });
 
     // Regenerate keypairs after adding new ones
     bittensorModule.regenerateMapAndAddresses();
-
+    const keyringMap = bittensorModule.keyringMap;
+    const keyringMapAddresses = bittensorModule.keyringAddressesMap;
+    let transactionMap = new Map<string, bigint>();
+    transactionMap.set(keyringMapAddresses.get('Owner')!, BigInt(100000e9));
+    transactionMap.set(keyringMapAddresses.get('Miner')!, BigInt(100000e9));
+    await bittensorModule.batchTransferRequest(
+      keyringMap.get('Alice')!,
+      transactionMap
+    );
+    transactionMap = new Map<string, bigint>();
     // default mnemonic for keyring with no specified mnemonics
     // bottom drive obey lake curtain smoke basket hold race lonely fit walk
 
@@ -77,7 +113,7 @@ async function main() {
     // create a keyring owner and miner accessor for simple access
     const keyringOwner = bittensorModule.keyringMap.get('Owner')!;
     const keyringMiner = bittensorModule.keyringMap.get('Miner')!;
-    const keyringMinerHotkey = bittensorModule.keyringMap.get('Miner')!;
+    const keyringMinerHotkey = bittensorModule.keyringMap.get('MinerAltKey')!;
 
     // loop through subnet count and generate subnets base on the owner
     console.log('Starting Subnet Generation...');
@@ -121,16 +157,21 @@ async function main() {
     console.log('Starting Validator Generation...');
     for (let i = 0; i < validatorCount; i++) {
       // create validator cold keyrings
+
+      const validatorMnemonic = mnemonicGenerate();
+      mnemonicMap.set(`Validator${i + 1}`, validatorMnemonic);
       const newValidator = bittensorModule.keyring.addFromUri(
-        `//Validator${i + 1}`,
+        `${validatorMnemonic}`,
         {
           name: `Validator${i + 1}`,
         }
       );
 
       // create validator hot keyrings
+      const validatorHotkeyMnemonic = mnemonicGenerate();
+      mnemonicMap.set(`Validator${i + 1}Hotkey`, validatorHotkeyMnemonic);
       const newValidatorHotkey = bittensorModule.keyring.addFromUri(
-        `//Validator${i + 1}Hotkey`,
+        `${validatorHotkeyMnemonic}`,
         {
           name: `Validator${i + 1}Hotkey`,
         }
@@ -139,10 +180,16 @@ async function main() {
       // validators generated
       console.log(
         `Validator key pair generated:
-      \nValidator${i + 1} Coldkey Addr: ${newValidator.address}
-      \nValidator${i + 1} Hotkey Addr: ${newValidatorHotkey.address}`
+      Validator${i + 1} Coldkey Addr: ${newValidator.address}
+      \nValidator${i + 1} Hotkey Addr: ${newValidatorHotkey.address}\n`
       );
       await bittensorModule.regenerateMapAndAddresses();
+
+      await bittensorModule.sendTransactionSecure(
+        bittensorModule.keyringMap.get('Alice')!,
+        newValidator.address,
+        BigInt(100000e9)
+      );
       await bittensorModule.getAccountData(newValidator.meta.name!, true, true);
       await bittensorModule.getAccountData(
         newValidatorHotkey.meta.name!,
@@ -287,7 +334,7 @@ async function main() {
       'Completed all subtensor setup, now writing keyringpairs to JSON...'
     );
     // write keypairs to JSON file
-    writeKeyPairsToJSON(bittensorModule.keyringMap);
+    writeKeyPairsToJSON(bittensorModule.keyringMap, mnemonicMap);
     console.log('Setup complete!');
   } finally {
     // Ensure API is disconnected even if an error occurs
@@ -396,10 +443,19 @@ async function handleTransaction(
  *
  * @param keyPairMap KeyringPair map to write to JSON
  */
-function writeKeyPairsToJSON(keyPairMap: Map<string, KeyringPair>) {
-  const result: Record<
+function writeKeyPairsToJSON(
+  keyPairMap: Map<string, KeyringPair>,
+  mnemonicMap: Map<string, string>
+) {
+  const accounts: Record<
     string,
-    { address: string; name: string; derivation: string }
+    {
+      address: string;
+      name: string;
+      derivation: string;
+      hotkey: boolean;
+      secretKey: string;
+    }
   > = {};
   // default polkadot dev seed
   const secretKey =
@@ -408,21 +464,44 @@ function writeKeyPairsToJSON(keyPairMap: Map<string, KeyringPair>) {
 
   // iterate through all keypairs and create an object literal
   for (const [name, keyringPair] of keyPairMap) {
-    result[name] = {
-      address: keyringPair.address,
-      name: keyringPair.meta.name!,
-      derivation: '//' + keyringPair.meta.name!,
-    };
+    const secretKeyForName = mnemonicMap.get(name);
+    if (name === 'Vault') {
+      accounts[name] = {
+        address: keyringPair.address,
+        name: keyringPair.meta.name!,
+        derivation: secretVaultKey!,
+        hotkey: false,
+        secretKey: secretKeyForName!,
+      };
+      continue;
+    }
+    if (name.toLowerCase().endsWith('hotkey')) {
+      accounts[name] = {
+        address: keyringPair.address,
+        name: keyringPair.meta.name!,
+        derivation: secretKeyForName!,
+        hotkey: true,
+        secretKey: secretKeyForName!,
+      };
+    } else {
+      accounts[name] = {
+        address: keyringPair.address,
+        name: keyringPair.meta.name!,
+        derivation: secretKeyForName!,
+        hotkey: false,
+        secretKey: secretKeyForName!,
+      };
+    }
   }
 
   // add additional data headers for the json
-  const resultWithHeader = {
+  const accountsWithHeader = {
     title: 'KeyringPairs for Bittensor generated by setupSubtensor.ts',
     createdAt: new Date().toISOString(),
-    totalKeyrings: Object.keys(result).length,
+    totalKeyrings: Object.keys(accounts).length,
     secretKeyDev: secretKey,
     vaultSecretKey: secretVaultKey,
-    result,
+    accounts,
   };
 
   const deploymentDir = path.join(__dirname, '..', 'deploymentData');
@@ -431,8 +510,18 @@ function writeKeyPairsToJSON(keyPairMap: Map<string, KeyringPair>) {
   const fileName = `keyring_data.json`;
   const filePath = path.join(deploymentDir, fileName);
 
+  const bigIntReplacer = (key: string, value: any) => {
+    if (typeof value === 'bigint') {
+      return value.toString();
+    }
+    return value;
+  };
+
   // write the json to file
-  fs.writeFileSync(filePath, JSON.stringify(resultWithHeader, null, 2));
+  fs.writeFileSync(
+    filePath,
+    JSON.stringify(accountsWithHeader, bigIntReplacer, 2)
+  );
   console.log('Keypair Wallet Data saved to:', filePath);
 }
 

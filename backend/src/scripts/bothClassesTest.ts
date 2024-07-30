@@ -13,27 +13,27 @@ import { Keyring } from '@polkadot/keyring';
 //import '@polkadot/wasm-crypto/initWasmAsm';
 
 async function main() {
-    const wsProviderTemp = new WsProvider(process.env.BITTENSOR_WS_PROVIDER);
-    console.log(process.env.BITTENSOR_WS_PROVIDER);
-    const apiTemp = await ApiPromise.create({ provider: wsProviderTemp });
-    let keyringTemp = new Keyring({ type: 'sr25519' });
+  const wsProviderTemp = new WsProvider(process.env.BITTENSOR_WS_PROVIDER);
+  console.log(process.env.BITTENSOR_WS_PROVIDER);
+  const apiTemp = await ApiPromise.create({ provider: wsProviderTemp });
+  let keyringTemp = new Keyring({ type: 'sr25519' });
 
-    const bittensorModule = new BittensorTestUtils(
-        apiTemp,
-        wsProviderTemp,
-        keyringTemp,
-        10
-    );
+  const bittensorModule = new BittensorTestUtils(
+    apiTemp,
+    wsProviderTemp,
+    keyringTemp,
+    10
+  );
 
-    const keyringUtils = new KeyringUtils(keyringTemp, 10);
+  const keyringUtils = new KeyringUtils(keyringTemp, 10);
 
-    const ethersClass = new EthersTestUtils();
+  const ethersClass = new EthersTestUtils();
 
-    const keyringPairs = keyringUtils.keyringPairs;
-    const keyringAddress = keyringUtils.keyringAddresses;
-    const etherWallets = ethersClass.signers;
-    const key = keyringTemp.addFromUri('//Owner');
-    console.log(key.address);
+  const keyringPairs = keyringUtils.keyringPairs;
+  const keyringAddress = keyringUtils.keyringAddresses;
+  const etherWallets = ethersClass.signers;
+  const key = keyringTemp.addFromUri('//Owner');
+  console.log(key.address);
 }
 /*
     console.log('\n Creating some eth keys....');

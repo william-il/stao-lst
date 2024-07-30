@@ -12,6 +12,9 @@ import {
   EventTypes,
   EventMap,
 } from '../types/eventsErrors';
+import 'tx2';
+import logger from '../utils/logger';
+
 dotenv.config();
 
 export default class EthersTestUtils {
@@ -21,6 +24,7 @@ export default class EthersTestUtils {
   private minterContract: ethers.Contract;
   private poolTaxContract: ethers.Contract;
   private errorDecoder: ErrorDecoder;
+  private logger = logger;
 
   constructor();
   constructor(
@@ -93,6 +97,16 @@ export default class EthersTestUtils {
     return this.emitTransactionReciptEvent(tx, 'Staked');
   }
 
+  public async getStakingRedemptionRatios() {
+    return {
+      stakingBasisPoints: await this.poolTaxContract.stakingBasisPoints(),
+      redeemBasisPoints: await this.poolTaxContract.redeemBasisPoints(),
+      lastRedeemBasisPoints: await this.poolTaxContract.lastRedeemBasisPoints(),
+      lastLastRedeemBasisPoints:
+        await this.poolTaxContract.lastLastRedeemBasisPoints(),
+    };
+  }
+
   public async stakeSTaoWithRange(
     amount: bigint,
     startIndex: number,
@@ -125,7 +139,11 @@ export default class EthersTestUtils {
     return eventRecipts;
   }
 
-  public async redeemSTao(amount: bigint, from: string | number) {
+  public async redeemSTao(
+    amount: bigint,
+    from: string | number,
+    bittensorRecipientAddr: string
+  ) {
     let fromWallet;
     let tx;
     try {
@@ -134,7 +152,7 @@ export default class EthersTestUtils {
           ? this.findWalletFromAddress(from)
           : this.signers[from];
       const tempContract = this.contract.connect(fromWallet) as ethers.Contract;
-      tx = await tempContract.redeemSTao(sTaoData.bittensorDefaultAddr, amount);
+      tx = await tempContract.redeemSTao(bittensorRecipientAddr, amount);
       tx = await tx.wait();
     } catch (error) {
       await this.processError(error, 'redeemSTao');
@@ -149,7 +167,10 @@ export default class EthersTestUtils {
     return new ethers.Wallet(ethereumPrivateKey, contractConnection);
   }
 
-  public async redeemAllSTao(from: string | number) {
+  public async redeemAllSTao(
+    from: string | number,
+    bittensorRecipientAddr: string
+  ) {
     let fromWallet;
     let tx;
     try {
@@ -159,7 +180,7 @@ export default class EthersTestUtils {
           : this.signers[from];
       const tempContract = this.contract.connect(fromWallet) as ethers.Contract;
       tx = await tempContract.redeemSTao(
-        sTaoData.bittensorDefaultAddr,
+        bittensorRecipientAddr,
         await tempContract.balanceOf(fromWallet.address)
       );
       tx = await tx.wait();
@@ -338,22 +359,26 @@ export default class EthersTestUtils {
         if (!eventMap.has(event.args[0])) {
           eventMap.set(event.args[0], {});
           let obj = eventMap.get(event.args[0]);
+
           event.args.forEach((arg, index) => {
             if (index !== 0) {
               obj[namesArray[index]] = arg;
             }
           });
+
           obj['eventCount'] = 1;
+          obj['lastBlock'] = event.blockNumber;
           eventMap.set(event.args[0], obj);
         } else {
           let obj = eventMap.get(event.args[0]);
+
           event.args.forEach((arg, index) => {
             if (index !== 0) {
               if (typeof arg === 'bigint') {
                 obj[namesArray[index]] += arg;
               }
               if (
-                'Redeemed' &&
+                eventName === 'Redeemed' &&
                 index === 1 &&
                 obj[namesArray[index]] !== arg &&
                 typeof obj[namesArray[index]] === 'string'
@@ -362,7 +387,9 @@ export default class EthersTestUtils {
               }
             }
           });
+
           obj['eventCount'] += 1;
+          obj['lastBlock'] = event.blockNumber;
           eventMap.set(event.args[0], obj);
         }
       });

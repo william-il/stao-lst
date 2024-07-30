@@ -50,7 +50,7 @@ fn localnet_genesis(
     let mut balances = vec![
         (
             get_account_id_from_seed::<sr25519::Public>("Alice"),
-            1000000000000000u128,
+            3000000000000000u128,
         ),
         (
             get_account_id_from_seed::<sr25519::Public>("Bob"),
@@ -71,46 +71,6 @@ fn localnet_genesis(
         (
             get_account_id_from_seed::<sr25519::Public>("Ferdie"),
             2000000000000u128,
-        ),
-        (
-            get_account_id_from_seed::<sr25519::Public>("Owner"),
-            200000000000000u128,
-        ),
-        (
-            get_account_id_from_seed::<sr25519::Public>("Validator1"),
-            200000000000000u128,
-        ),
-        (
-            get_account_id_from_seed::<sr25519::Public>("Validator2"),
-            200000000000000u128,
-        ),
-        (
-            get_account_id_from_seed::<sr25519::Public>("Miner"),
-            200000000000000u128,
-        ),
-        (
-            get_account_id_from_seed::<sr25519::Public>("Validator3"),
-            200000000000000u128,
-        ),
-        (
-            get_account_id_from_seed::<sr25519::Public>("Validator4"),
-            200000000000000u128,
-        ),
-        (
-            get_account_id_from_seed::<sr25519::Public>("Validator5"),
-            200000000000000u128,
-        ),
-        (
-            get_account_id_from_seed::<sr25519::Public>("Validator6"),
-            200000000000000u128,
-        ),
-        (
-            get_account_id_from_seed::<sr25519::Public>("Validator7"),
-            200000000000000u128,
-        ),
-        (
-            get_account_id_from_seed::<sr25519::Public>("Validator8"),
-            200000000000000u128,
         ),
     ];
 

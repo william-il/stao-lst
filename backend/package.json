@@ -44,7 +44,9 @@
     "dotenv": "^16.4.5",
     "ethers": "^6.13.1",
     "node-cron": "^3.0.3",
+    "tx2": "^1.0.5",
     "winston": "^3.13.0",
+    "winston-daily-rotate-file": "^5.0.0",
     "yargs": "^17.7.2"
   }
 }

@@ -7,5 +7,6 @@
   "files.autoSave": "onFocusChange", // optional but recommended
   "vs-code-prettier-eslint.prettierLast": false, // set as "true" to run 'prettier' last not first
   "editor.wordWrap": "wordWrapColumn",
-  "editor.wordWrapColumn": 160
+  "editor.wordWrapColumn": 160,
+  "editor.tabSize": 2
 }

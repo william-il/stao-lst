@@ -317,7 +317,7 @@ contract sTAO is
     }
 
     function unpause() public onlyRole(PAUSER_ROLE) {
-        _unpause();
+        _unpause(); 
     }
 
     function transferProtocolVault(

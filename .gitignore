@@ -20,4 +20,5 @@ ignition/deployments/chain-31337
 
 # generated jsons
 backend/src/deploymentData/*
-
+backend/src/logData/*
+!backend/src/logData/.gitkeep
