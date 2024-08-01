@@ -83,6 +83,7 @@ Assuming the bittensor side is already setup, run the backend processor.
 npx tsx backend/src/index.ts
 ```
 ---
+---
 
 ## Bittensor utilities
 To check the list of delgates:
