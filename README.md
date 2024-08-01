@@ -68,6 +68,8 @@ BUILD_BINARY=0 ./scripts/localnet.sh
 
 Run the subtensor builder script  
 This script creates validators, miners, subnets, a owner, and adds stake to each validator.
+This script does take around 1-3 minutes to run depending on how many validators you choose.
+This is because the script manually does the transactions for each validator, for each subnet
 * --subnet-count or --sc can be between 1 - 8, and defaults to 1
 * --validator-count or --vc can be between 2 - 8, and defaults to 2
 
