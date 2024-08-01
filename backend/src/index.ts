@@ -6,9 +6,12 @@ import { ethers } from 'ethers';
 import BittensorTestUtils from './processors/BittensorTestUtils';
 import EthersTestUtils from './processors/EthersTestUtils';
 import IntegratedSystem from './processors/IntegratedSystem';
+import FinanceUtils, { PortfolioVector } from './processors/FinanceUtils';
+
 import dotenv from 'dotenv';
 import * as path from 'path';
 import EthKey from './types/EthKey';
+import Decimal from 'decimal.js';
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 async function main() {
@@ -30,15 +33,22 @@ async function main() {
   const keyringAddress = bittensorModule.keyringAddresses;
   const keyringPairs = bittensorModule.keyringPairs;
   const ethereumWallets = ethereumModule.signers;
-
+  const targetPortfolioVector = {
+    Validator1Hotkey: new Decimal(0.3),
+    Validator2Hotkey: new Decimal(0.3),
+    Validator3Hotkey: new Decimal(0.4),
+  };
   const integratedSystem = new IntegratedSystem(
     bittensorModule,
-    ethereumModule
+    ethereumModule,
+    targetPortfolioVector,
+    true
   );
 
   console.log('Testing the integrated system...');
   await integratedSystem.start();
-
+  integratedSystem.shouldLog = true;
+/* 
   console.log(`\nAddingAnEthKey...`);
   //first add a valid ethKey to the contract.
   const aliceSignature = await bittensorModule.signMessageAsHex(
@@ -59,10 +69,10 @@ async function main() {
       await bittensorModule.sendTransactionSecure(
         bittensorModule.coldKeyPairsMap.get('Alice')!,
         bittensorModule.coldKeyPairsMap.get('Vault')!,
-        BigInt(107e8),
+        BigInt(100e9),
         false
       );
-    });
+    }); */
 }
 
 main().catch(console.error);

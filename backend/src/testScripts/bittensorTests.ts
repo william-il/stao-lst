@@ -2,7 +2,6 @@ import { ethers } from 'ethers';
 import { sTaoData } from '../data/ethData';
 import EthersTestUtils from '../processors/EthersTestUtils';
 import testSigners from '../data/testWallets';
-import batchQueriedEvents from '../utils/etherEventBatcher';
 import { eth } from '@polkadot/types/interfaces/definitions';
 
 import '@polkadot/wasm-crypto/initWasmAsm';

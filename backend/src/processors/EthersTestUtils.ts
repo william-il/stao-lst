@@ -1,18 +1,9 @@
 import { ethers } from 'ethers';
 import sTaoData from '../data/ethData';
 import dotenv from 'dotenv';
-import { EventEmitter } from 'events';
 import { ErrorDecoder, ErrorType } from 'ethers-decode-error';
-import batchQueriedEvents from '../utils/etherEventBatcher';
 import signerList from '../data/testWallets';
 import EthKey from '../types/EthKey';
-import {
-  EventBase,
-  EventTypeNames,
-  EventTypes,
-  EventMap,
-} from '../types/eventsErrors';
-import 'tx2';
 import logger from '../utils/logger';
 
 dotenv.config();
@@ -99,7 +90,7 @@ export default class EthersTestUtils {
 
   public async getStakingRedemptionRatios() {
     return {
-      stakingBasisPoints: await this.poolTaxContract.stakingBasisPoints(),
+      stakingBasisPoints: await this.poolTaxContract.stakeBasisPoints(),
       redeemBasisPoints: await this.poolTaxContract.redeemBasisPoints(),
       lastRedeemBasisPoints: await this.poolTaxContract.lastRedeemBasisPoints(),
       lastLastRedeemBasisPoints:
@@ -205,6 +196,7 @@ export default class EthersTestUtils {
       console.log('Update complete!');
     } catch (error) {
       await this.processError(error, 'updateRatiosWithPercentage');
+      throw error;
     }
     return this.emitTransactionReciptEvent(tx, 'PoolBasisPointsUpdated');
   }

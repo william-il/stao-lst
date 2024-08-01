@@ -22,3 +22,5 @@ ignition/deployments/chain-31337
 backend/src/deploymentData/*
 backend/src/logData/*
 !backend/src/logData/.gitkeep
+backend/src/random/*
+ignition/*

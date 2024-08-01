@@ -3,7 +3,7 @@ import { Keyring } from '@polkadot/keyring';
 import { decorateConstants, u16 } from '@polkadot/types';
 import { _0n, BN, stringToU8a, u8aToHex } from '@polkadot/util';
 import { signatureVerify } from '@polkadot/util-crypto';
-import bitData from '../data/bitData';
+import bitData from '../random/bitData';
 import dotenv from 'dotenv';
 import '@polkadot/keyring';
 import {

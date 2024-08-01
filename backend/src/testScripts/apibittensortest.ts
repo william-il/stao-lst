@@ -9,7 +9,7 @@ import {
 } from '@polkadot/util-crypto';
 import dotenv from 'dotenv';
 import '../interfaces/augment-api';
-import bitData from '../data/bitData';
+import bitData from '../random/bitData';
 import { appendFileSync } from 'fs';
 import * as path from 'path';
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });

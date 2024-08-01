@@ -3,14 +3,13 @@ import data, { sTaoData } from '../data/ethData';
 import dotenv from 'dotenv';
 import { EventEmitter } from 'events';
 import { ErrorDecoder, ErrorType } from 'ethers-decode-error';
-import batchQueriedEvents from '../utils/etherEventBatcher';
-import { Redeemed } from '../types/eventsErrors';
+import { Redeemed } from '../random/eventsErrors';
 import {
   EventBase,
   EventTypeNames,
   EventTypes,
   EventMap,
-} from '../types/eventsErrors';
+} from '../random/eventsErrors';
 const provider = new ethers.JsonRpcProvider(process.env.HARDHAT_RPC);
 const sTAOContract = new ethers.Contract(data.address, data.abi, provider);
 const minterSigner = new ethers.Wallet(data.minterPK, provider);
@@ -156,7 +155,7 @@ async function main() {
     }
     console.log('bal: ', await sTAOContract.balanceOf(walletSinger.address));
   }
-  const maps = await batchQueriedEvents(
+  /*   const maps = await batchQueriedEvents(
     sTAOContract,
     0,
     'latest',
@@ -164,7 +163,7 @@ async function main() {
     true
   );
   console.log(maps);
-  await batchEvents();
+  await batchEvents(); */
 }
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

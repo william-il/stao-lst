@@ -3,8 +3,8 @@ import data, { sTaoData } from '../data/ethData';
 import dotenv from 'dotenv';
 import { EventEmitter, EventEmitterAsyncResource } from 'events';
 import { ErrorDecoder, ErrorType } from 'ethers-decode-error';
-import { Redeemed } from '../types/eventsErrors';
-import { EventBase } from '../types/eventsErrors';
+import { Redeemed } from '../random/eventsErrors';
+import { EventBase } from '../random/eventsErrors';
 
 // deprecatead
 export default async function batchQueriedEvents(

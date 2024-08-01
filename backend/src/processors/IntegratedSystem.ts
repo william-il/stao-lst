@@ -2,15 +2,22 @@ import '@polkadot/wasm-crypto/initWasmAsm';
 import { EventEmitter } from 'events';
 import BittensorTestUtils from './BittensorTestUtils';
 import EthersTestUtils from './EthersTestUtils';
-import { ethers } from 'ethers';
-import EthKey from '../types/EthKey';
 import { Decimal } from 'decimal.js';
 import '@polkadot/wasm-crypto/initWasmAsm';
-import { add } from 'winston';
-import 'tx2';
 import logger from '../utils/logger';
 import FinanceUtils, { PortfolioVector } from './FinanceUtils';
-import { error } from 'console';
+import { KeyringPair } from '@polkadot/keyring/types';
+
+import HotKeyPortfolio from '../types/HotkeyPortfolio';
+import { ApiPromise, WsProvider } from '@polkadot/api';
+import { Keyring } from '@polkadot/keyring';
+import { stringToU8a, u8aToHex } from '@polkadot/util';
+import {
+  mnemonicValidate,
+  signatureVerify,
+  cryptoWaitReady,
+} from '@polkadot/util-crypto';
+import '../interfaces/augment-api';
 
 interface Transfer {
   from: string;
@@ -36,11 +43,15 @@ export default class IntegratedSystem {
   private isRebalancingStakingAndUnstaking: boolean = false;
   private runningTotalAmountToStake;
   private BITTENSOR_FEE = 124560n;
+  private shouldTax: boolean = false;
+  private vaultKeyringPair: KeyringPair;
+  public shouldLog: boolean = false;
 
   constructor(
     bittensor: BittensorTestUtils,
     ethereum: EthersTestUtils,
-    finance: FinanceUtils
+    intialTargetPortfolioVector: PortfolioVector,
+    shouldLog: boolean = false
   ) {
     this.bittensor = bittensor;
     this.ethereum = ethereum;
@@ -48,12 +59,17 @@ export default class IntegratedSystem {
     this.transferQueue = [];
     this.lastProcessedBlock = { value: 0 };
     this.isStaking = true; // Start by staking, can't unstake until staking
-    this.finance = finance;
-    this.targetAllocationVector = finance.targetPortfolioVector;
+    this.finance = new FinanceUtils(
+      this.bittensor,
+      intialTargetPortfolioVector
+    );
+    this.targetAllocationVector = this.finance.targetPortfolioVector;
     this.amountToStake = 0n;
     this.runningTotalAmountToStake = 0n;
+    this.vaultKeyringPair = this.bittensor.keyringMap.get('Vault')!;
+    this.shouldLog = shouldLog;
     this.setupEventListeners();
-    this.startScheduledTasks();
+    this.startScheduledTasks(this.shouldLog);
   }
 
   private setupEventListeners() {
@@ -77,40 +93,35 @@ export default class IntegratedSystem {
   }
 
   // start scheduled tasks, time is set like (minutes * seconds per minute * milliseconds per second)
-  private startScheduledTasks() {
+  private startScheduledTasks(shouldLog: boolean = false) {
     this.logger.logger.profile('startScheduledTasks');
 
     setInterval(
       async () => {
         this.isRebalancingStakingAndUnstaking = true;
-
+        await this.logAllServerStatus('before rebalance');
         try {
           this.logger.info(
             'Starting Scheduled Tasks, starting to rebalance stake and unstake',
             {
-              functionName: 'startScheudledTasks',
+              functionName: 'startScheduledTasks',
               isStaking: this.isStaking,
             }
           );
+          await this.rebalanceVaultStakeAndUnstake();
 
-          // Then, alternate staking/unstaking
-          //console.log('Starting alternateStakingUnstaking');
-          //const shoudUpdate = await this.alternateStakingUnstaking();
-          //console.log('alternateStakingUnstaking completed successfully');
+          await this.updateRedemptionAndStakingRatios();
 
-          this.logger.info('Alternate Staking and Unstaking completed', {
+          await this.logAllServerStatus('after rebalance');
+
+          this.logger.info('Schedule Tasks Completed\n', {
             functionName: 'startScheudledTasks',
             isStaking: this.isStaking,
           });
-
-          //console.log('All scheduled tasks completed successfully');
         } catch (error) {
-          this.logger.error('Error in Alternate Staking and Unstaking', {
+          this.logger.error('Error in Scheduled Tasks', {
             functionName: 'startScheudledTasks',
           });
-          //console.error('Error in scheduled tasks:', error);
-          // Optionally, you could add more specific error handling here
-          // For example, you might want to handle errors from each task differently
         }
         this.isRebalancingStakingAndUnstaking = false;
       },
@@ -122,13 +133,14 @@ export default class IntegratedSystem {
       async () => {
         if (!this.isRebalancingStakingAndUnstaking) {
           try {
-            this.logger.info('Processing Transfer Queue', {
+            this.logger.info('Processing Transfer Queue...', {
               functionName: 'startScheudledTasks',
               queue: this.transferQueue,
             });
+
             await this.processTransferQueue();
 
-            this.logger.info('Processing Transfer Queue Completed', {
+            this.logger.info('Processing Transfer Queue Completed\n', {
               functionName: 'startScheudledTasks',
               queue: this.transferQueue,
             });
@@ -136,11 +148,10 @@ export default class IntegratedSystem {
             this.logger.error('Error in Processing Transfer Queue', {
               functionName: 'startScheudledTasks',
             });
-            // console.error('Error processing transfer queue:', error);
           }
         }
       },
-      1 * 5 * 1000
+      1 * 10 * 1000
     ); // Every 5 minutes
     this.logger.logger.profile('startScheudledTasks');
   }
@@ -177,7 +188,11 @@ export default class IntegratedSystem {
       queue: this.transferQueue,
       queueSize: this.transferQueue.length,
     });
-
+    if (this.transferQueue.length === 0) {
+      this.logger.info('Transfer Queue is Empty', {
+        functionName: 'processTransferQueue',
+      });
+    }
     while (this.transferQueue.length > 0) {
       this.logger.logger.profile('processTransferQueue', {
         startTime: Date.now(),
@@ -191,6 +206,15 @@ export default class IntegratedSystem {
         addressSendingTao: address,
         amountSent: amount,
       });
+
+      if (this.shouldLog) {
+        console.log(
+          'Transfer Queue Element Found, \nAddress: ',
+          address,
+          '\nAmount: ',
+          amount
+        );
+      }
 
       try {
         const usersAccount = await this.ethereum.retrieveEthKeyAccount(address);
@@ -214,14 +238,36 @@ export default class IntegratedSystem {
               validAccount: validAccount,
             });
             const taxedTaoAmount = amount - this.BITTENSOR_FEE;
-            await this.ethereum.stakeSTao(
+            const receipt = await this.ethereum.stakeSTao(
               this.convert9To18Decimals(taxedTaoAmount),
               validAccount.address
             );
-            console.log(`\n Successfully processed transaction queue element`);
+            if (this.shouldLog) {
+              console.log('Valid Transaction Signature Found, Staking sTao: ');
+              console.log('Ethereum Address: ', validAccount.address);
+              console.log('Tao Address: ', address);
+              console.log('Tao Amount Sent: ', amount);
+              console.log('Receipt: ');
+              console.log('   Ethereum Reciever Addr: ', receipt.to);
+              console.log(
+                '   Bittensor Sender Addr: ',
+                receipt.bittensorWallet
+              );
+              console.log('   Total sTAO Created: ', receipt.totalAmountStaked);
+              console.log('   sTAO Taxed: ', receipt.amountTaxed);
+              console.log('   sTAO Sent to User: ', receipt.amountToUser);
+              console.log(
+                '   Last Time the Ratios Were Updated: ',
+                receipt.lastTimeUpdated
+              );
+            }
           }
         } else {
-          throw new Error('User');
+          this.logger.warn('Tao was sent with no valid Eth Key Account', {
+            functionName: 'processTransferQueue',
+            addressSendingTao: address,
+            amountSent: amount,
+          });
         }
       } catch (error) {
         await this.ethereum.processError(error, 'processTransferQueue');
@@ -260,10 +306,23 @@ export default class IntegratedSystem {
         totalSTaoInCirculation
       );
       if (newRedeemRatioPercentage) {
-        await this.ethereum.updateRatiosWithPercentage(
-          newRedeemRatioPercentage,
-          BigInt(18)
-        );
+        try {
+          await this.ethereum.updateRatiosWithPercentage(
+            newRedeemRatioPercentage,
+            BigInt(18)
+          );
+        } catch (error) {
+          this.logger.warn(
+            `Redemption and Staking Ratios Not Updated Due to error: ${error}`,
+            {
+              functionName: 'updateRedemptionAndStakingRatios',
+              newRedeemRatioPercentage: newRedeemRatioPercentage,
+              totalInStake: totalInStake,
+              totalSTaoInCirculation: totalSTaoInCirculation,
+            }
+          );
+        }
+
         const ratios = await this.ethereum.getStakingRedemptionRatios();
         this.logger.info(
           'Completed Updating Redemption and Staking Ratios On Smart Contract',
@@ -276,6 +335,16 @@ export default class IntegratedSystem {
           }
         );
         //console.log(`Updated redemption and staking ratios`);
+      } else {
+        this.logger.info(
+          'Completed Updating Redemption and Staking Ratios,\n No Update Due to an Incoming Negative Ratio',
+          {
+            functionName: 'updateRedemptionAndStakingRatios',
+            newRedeemRatioPercentage: newRedeemRatioPercentage,
+            totalInStake: totalInStake,
+            totalSTaoInCirculation: totalSTaoInCirculation,
+          }
+        );
       }
     } catch (error) {
       this.logger.logger.profile('updateRedemptionAndStakingRatios');
@@ -336,6 +405,9 @@ export default class IntegratedSystem {
     this.logger.logger.profile('processRedeemRequests');
   }
 
+  /***
+   * deprecated
+   */
   private taxTransactions(
     transactionMap: Map<string, bigint>,
     flatTaxAmount: bigint = BigInt(120000)
@@ -355,29 +427,361 @@ export default class IntegratedSystem {
     } catch (error) {}
   }
 
-  private async reblanaceVaultStakeAndUnstake() {
+  private async rebalanceVaultStakeAndUnstake() {
     this.logger.logger.profile('rebalanceVaultStakeAndUnstake');
     // rebalance call:
     // this requires knowing how much tao will be staked,
     // how much tao that needs to be sent over to the users.
     const totalToStake = this.amountToStake;
-    let totalToUnstake = 0n;
     const burnEvents = (await this.processRedeemRequests()) as Map<any, any>;
 
-    for (const [key, value] of burnEvents) {
+    const { burnTransactionMap, totalTaoToSend } =
+      this.processBurnForTransaction(burnEvents, this.shouldTax);
+
+    this.logger.info(
+      'Rebalancing Vault Stake and Unstake, sTAO contract Burn Events',
+      {
+        functionName: 'rebalanceVaultStakeAndUnstake',
+        burnEvents: burnEvents,
+        totalToUnstakes: totalTaoToSend,
+        runningTotalAmountToStake: this.runningTotalAmountToStake,
+      }
+    );
+
+    // get total input and total output tao, and calculate stake and unstake rates
+    const { transactionMap, shouldDoSendTx } =
+      await this.finance.rebalanceAndCreateStakeTransactions(
+        totalToStake,
+        totalTaoToSend,
+        this.shouldLog
+      );
+
+    if (shouldDoSendTx) {
+      this.logger.info(
+        'Sending Staking and Unstaking Transactions To Rebalance',
+        {
+          functionName: 'rebalanceVaultStakeAndUnstake',
+          transactionMap: transactionMap,
+        }
+      );
+      await this.bittensor.batchStakingUnstakingRequest(
+        this.bittensor.keyringMap.get('Vault')!,
+        transactionMap,
+        this.shouldLog
+      );
+    } else {
+      this.logger.info('No Staking and Unstaking Transactions To Send', {
+        functionName: 'rebalanceVaultStakeAndUnstake',
+      });
     }
 
+    // now send tao back to all users
+    let didSendBurnTransactionMap = false;
+    if (burnTransactionMap.size > 0) {
+      await this.sendBurnTransactionMap(burnTransactionMap);
+      didSendBurnTransactionMap = true;
+      this.logger.info('Sent Processed Burn Event Transaction Map Requests', {
+        functionName: 'rebalanceVaultStakeAndUnstake',
+        didSendBurnTransactionMap: didSendBurnTransactionMap,
+        burnTransactionMap: burnTransactionMap,
+      });
+    } else {
+      this.logger.info('No burn transactions on the map to send', {
+        functionName: 'rebalanceVaultStakeAndUnstake',
+        didSendBurnTransactionMap: didSendBurnTransactionMap,
+      });
+    }
+
+    this.amountToStake = 0n;
+
+    this.logger.info(
+      'Completed Rebalancing Vault Stake and Unstake, and Burn Transfer',
+      {
+        functionName: 'rebalanceVaultStakeAndUnstake',
+        burnEvents: burnEvents,
+        totalToUnstakes: totalTaoToSend,
+        runningTotalAmountToStake: this.runningTotalAmountToStake,
+        didSendBurnTransactionMap: didSendBurnTransactionMap,
+      }
+    );
     this.logger.logger.profile('rebalanceVaultStakeAndUnstake');
   }
 
-  private async setTargetAllocationVector(
+  private processBurnForTransaction(
+    burnEvents: Map<any, any>,
+    shouldTax: boolean = false
+  ) {
+    this.logger.info('Processing Burn Event to Transactional Map', {
+      functionName: 'processBurnForTransaction',
+      burnEvents: burnEvents,
+      shouldTax: shouldTax,
+    });
+    let totalTaoToSend = 0n;
+    const burnTransactionMap: Map<string, bigint> = new Map();
+    try {
+      if (burnEvents === undefined) {
+        this.logger.info('Completed processing burn events, No events found', {
+          functionName: 'processBurnForTransaction',
+        });
+        return { burnTransactionMap, totalTaoToSend };
+      }
+      for (const [key, value] of burnEvents) {
+        let taoToSendToUser = value.taoToUser;
+        if (shouldTax) {
+          taoToSendToUser -= this.BITTENSOR_FEE;
+        }
+        burnTransactionMap.set(key, taoToSendToUser);
+        totalTaoToSend += taoToSendToUser;
+      }
+    } catch (error) {
+      this.logger.error(
+        'Error in Processing Burn Events To Transactional Map',
+        error,
+        {
+          functionName: 'processBurnForTransaction',
+          burnEvents: burnEvents,
+        }
+      );
+      console.error(
+        'error detected in processing burn for transactional map',
+        error
+      );
+      throw new Error('Error in processing burn events');
+    }
+
+    this.logger.info('Completed Processing Burn Event to Tranasctional Map', {
+      functionName: 'processBurnForTransaction',
+    });
+
+    return { burnTransactionMap, totalTaoToSend };
+  }
+
+  private async sendBurnTransactionMap(
+    burnTransactionMap: Map<string, bigint>
+  ) {
+    try {
+      this.logger.info('Sending the Burn Transaction Map to Users', {
+        functionName: 'sendBurnTransactionMap',
+        sender: this.bittensor.keyringMap.get('Vault')!,
+        burnTransactionMap: burnTransactionMap,
+      });
+      await this.bittensor.batchTransferRequest(
+        this.bittensor.keyringMap.get('Vault')!,
+        burnTransactionMap
+      );
+      this.logger.info('Completed Sending the Burn Transaction Map to Users', {
+        functionName: 'sendBurnTransactionMap',
+      });
+    } catch (error) {
+      this.logger.error(
+        'Error When Sending Burn Transaction map to Users',
+        error,
+        {
+          functionName: 'sendBurnTransactionMap',
+        }
+      );
+      throw error;
+    }
+  }
+
+  public async setTargetAllocationVector(
     targetPortfolioVector: PortfolioVector
   ) {
     await this.finance.setTargetPortfolioVector(targetPortfolioVector);
   }
 
-  // Promise<Map<string, bigint>>
-  /*   private async smartUnstakeAndTransfer(
+  public async logAllServerStatus(
+    interval: string = '',
+    verbose: boolean = false
+  ) {
+    console.log(
+      '\n******************************************************************'
+    );
+    console.log(`Server Stats ${interval}:`);
+    console.log(
+      '******************************************************************'
+    );
+
+    await this.logEtherStatus();
+
+    await this.logBittensorStatus(verbose);
+
+    this.logServerStatus();
+
+    console.log(
+      '******************************************************************'
+    );
+    console.log('Server Stats Completed');
+    console.log(
+      '******************************************************************\n'
+    );
+  }
+
+  public async logEtherStatus() {
+    console.log('\nEthereum Statistics');
+    console.log('-------------------');
+    console.log('sTaoSupply: ', await this.ethereum.contract.totalSupply());
+    console.log(
+      'Redeem Ratio: ',
+      await this.ethereum.contract.redeemBasisPoints()
+    );
+    console.log(
+      'Last Redeem Ratio: ',
+      await this.ethereum.contract.lastRedeemBasisPoints()
+    );
+    console.log(
+      'Last Last Redeem Ratio: ',
+      await this.ethereum.contract.lastLastRedeemBasisPoints()
+    );
+    console.log(
+      'Staking Ratio: ',
+      await this.ethereum.contract.stakeBasisPoints()
+    );
+  }
+
+  public async logBittensorStatus(verbose: boolean) {
+    console.log('\nBittensor Statistics:');
+    console.log('---------------------');
+    const balData = await this.bittensor.getSingularBalance(
+      this.vaultKeyringPair
+    );
+    const stakeData = await this.bittensor.getTotalColdKeyStake(
+      this.vaultKeyringPair.address
+    );
+    const hotKeyPortfolio = await this.bittensor.getCurrentHotKeyPortfolio();
+    if (verbose) {
+      console.log('Vault Wallet Account: ', balData.data.toHuman());
+      console.log('Total Stake: ', stakeData);
+      await this.bittensor.getTransferFee(
+        this.vaultKeyringPair,
+        this.vaultKeyringPair
+      );
+      console.log('Current HotkeyPortfolio: ', hotKeyPortfolio);
+    } else {
+      console.log('Vault Wallet Account: ');
+      console.log('Free: ', balData.data.free.toBigInt());
+      console.log('Total Staked ', stakeData);
+      await this.bittensor.getTransferFee(
+        this.vaultKeyringPair,
+        this.vaultKeyringPair
+      );
+      console.log(
+        'Total Amount of Tao In Vault: ',
+        stakeData + balData.data.free.toBigInt()
+      );
+      console.log('\nCurrent HotkeyPortfolio: ');
+      Object.entries(hotKeyPortfolio).forEach(([key, value]) => {
+        console.log(
+          `${key}: \n\tWeight: ${value.weight}\n\tTao Staked: ${value.taoAmount}`
+        );
+      });
+    }
+    console.log('Target Vector: ', await this.finance.targetPortfolioVector);
+  }
+
+  public logServerStatus() {
+    console.log('\nSystems Stats: ');
+    console.log('--------------');
+    console.log('Transfer Queue: ', this.transferQueue);
+    console.log('Vault keyring Address: ', this.vaultKeyringPair.address);
+    console.log('Last Processed Block: ', this.lastProcessedBlock);
+    console.log('Amount To Stake: ', this.amountToStake);
+    console.log('Running amount to stake: ', this.runningTotalAmountToStake);
+  }
+
+  /**
+   * calculating new sTao redemption ratio by diving total staked Tao by total sTao supply
+   *
+   * @param totalInStake should be a 9 decimal Tao amount
+   * @param totalSTaoInCirculation should be a 18 decimal sTao amount
+   * @returns the basis points of the new redemption ratio (always has 18 decimals)
+   */
+  private calculateNewRatio(
+    totalInStake: bigint,
+    totalSTaoInCirculation: bigint
+  ) {
+    const totalInStakeScaled = this.convert9To18Decimals(totalInStake);
+
+    const toDecimalStake = new Decimal(totalInStakeScaled.toString());
+    const toDecimalCirculation = new Decimal(totalSTaoInCirculation.toString());
+    const result = toDecimalStake.dividedBy(toDecimalCirculation).times(100);
+    const scaledResult = result.times(1e18);
+    /*
+        if (result.lessThan(new Decimal(100))) {
+            console.log(`invalid ratio, is negative`);
+            throw new Error('Invalid ratio');
+        }
+            */
+    console.log('In calculate New Ratio: \n');
+    console.log(
+      `total TAO staked ${totalInStake}, total sTAO supply: ${totalSTaoInCirculation}`
+    );
+    console.log(
+      `In human Tao ${this.humanReadableE18(totalInStakeScaled)} in Human sTAO supply : ${this.humanReadableE18(totalSTaoInCirculation)}`
+    );
+    console.log(
+      `Scaled End Ratio Result: ${BigInt(scaledResult.floor().toFixed(0))}`
+    );
+    return BigInt(scaledResult.floor().toFixed(0));
+  }
+
+  /**
+   * Helper function to convert 9 decimal Tao values to 18 decimal values
+   *
+   * @param amount 9 decimal Tao value
+   * @returns  18 decimal tao value
+   */
+  private convert9To18Decimals(amount: bigint) {
+    const scaleFactor = BigInt(1e9);
+    return amount * scaleFactor;
+  }
+
+  /**
+   * Helper function to convert 18 decimal Tao values to 9 decimal values
+   * note that Tao is normally 9 decimals, so there isn't issues with truncating extra decimals
+   *
+   * @param amount 18 decimal Tao value
+   * @returns  9 decimal tao value
+   */
+  private convert18To9Decimals(amount: bigint) {
+    const scaleFactor = BigInt(1e9);
+    return amount / scaleFactor;
+  }
+
+  /**
+   * Utility to help read 18 decimal values
+   *
+   * @param amount 18 decimal value
+   * @returns the amount in a human readable form
+   */
+  private humanReadableE18(amount: bigint) {
+    const amountAsDecimal = new Decimal(amount.toString());
+    return amountAsDecimal.div(1e18).floor().toFixed(18);
+  }
+  /**
+   * Utility to help read 9 decimal values
+   *
+   * @param amount 9 decimal value
+   * @returns the amount in a human readable form
+   */
+  private humanReadableE9(amount: bigint) {
+    const amountAsDecimal = new Decimal(amount.toString());
+    return amountAsDecimal.div(1e9).floor().toFixed(9);
+  }
+
+  public setBittensorFee(fee: bigint) {
+    this.BITTENSOR_FEE = fee;
+  }
+
+  public async start() {
+    await this.finance.initalize();
+    await this.listenToIncomingTransfers();
+    console.log('Started the processor');
+  }
+}
+
+// Promise<Map<string, bigint>>
+/*   private async smartUnstakeAndTransfer(
     burnEvents: any[] | Map<any, any> | undefined,
     shouldTax: boolean = false
   ): Promise<boolean> {
@@ -547,7 +951,7 @@ export default class IntegratedSystem {
     }
   } */
 
-  /* private async alternateStakingUnstaking(): Promise<boolean> {
+/* private async alternateStakingUnstaking(): Promise<boolean> {
     try {
       this.logger.logger.profile('alternateStakingUnstaking');
       this.logger.info('Starting Alternate Staking and Unstaking', {
@@ -640,92 +1044,3 @@ export default class IntegratedSystem {
     }
     return false;
   } */
-
-  /**
-   * calculating new sTao redemption ratio by diving total staked Tao by total sTao supply
-   *
-   * @param totalInStake should be a 9 decimal Tao amount
-   * @param totalSTaoInCirculation should be a 18 decimal sTao amount
-   * @returns the basis points of the new redemption ratio (always has 18 decimals)
-   */
-  private calculateNewRatio(
-    totalInStake: bigint,
-    totalSTaoInCirculation: bigint
-  ) {
-    const totalInStakeScaled = this.convert9To18Decimals(totalInStake);
-
-    const toDecimalStake = new Decimal(totalInStakeScaled.toString());
-    const toDecimalCirculation = new Decimal(totalSTaoInCirculation.toString());
-    const result = toDecimalStake.dividedBy(toDecimalCirculation).times(100);
-    const scaledResult = result.times(1e18);
-    /*
-        if (result.lessThan(new Decimal(100))) {
-            console.log(`invalid ratio, is negative`);
-            throw new Error('Invalid ratio');
-        }
-            */
-    console.log('In calculate New Ratio \n\n:');
-    console.log(
-      `total TAO staked ${totalInStake}, total sTAO supply: ${totalSTaoInCirculation}`
-    );
-    console.log(
-      `In human Tao ${this.humanReadableE18(totalInStakeScaled)} in Human sTAO supply : ${this.humanReadableE18(totalSTaoInCirculation)}`
-    );
-    console.log(
-      `Scaled End Ratio Result: ${BigInt(scaledResult.floor().toFixed(0))}`
-    );
-    return BigInt(scaledResult.floor().toFixed(0));
-  }
-
-  /**
-   * Helper function to convert 9 decimal Tao values to 18 decimal values
-   *
-   * @param amount 9 decimal Tao value
-   * @returns  18 decimal tao value
-   */
-  private convert9To18Decimals(amount: bigint) {
-    const scaleFactor = BigInt(1e9);
-    return amount * scaleFactor;
-  }
-
-  /**
-   * Helper function to convert 18 decimal Tao values to 9 decimal values
-   * note that Tao is normally 9 decimals, so there isn't issues with truncating extra decimals
-   *
-   * @param amount 18 decimal Tao value
-   * @returns  9 decimal tao value
-   */
-  private convert18To9Decimals(amount: bigint) {
-    const scaleFactor = BigInt(1e9);
-    return amount / scaleFactor;
-  }
-
-  /**
-   * Utility to help read 18 decimal values
-   *
-   * @param amount 18 decimal value
-   * @returns the amount in a human readable form
-   */
-  private humanReadableE18(amount: bigint) {
-    const amountAsDecimal = new Decimal(amount.toString());
-    return amountAsDecimal.div(1e18).floor().toFixed(18);
-  }
-  /**
-   * Utility to help read 9 decimal values
-   *
-   * @param amount 9 decimal value
-   * @returns the amount in a human readable form
-   */
-  private humanReadableE9(amount: bigint) {
-    const amountAsDecimal = new Decimal(amount.toString());
-    return amountAsDecimal.div(1e9).floor().toFixed(9);
-  }
-
-  public setBittensorFee(fee: bigint) {
-    this.BITTENSOR_FEE = fee;
-  }
-  public async start() {
-    await this.listenToIncomingTransfers();
-    console.log('Started the processor');
-  }
-}

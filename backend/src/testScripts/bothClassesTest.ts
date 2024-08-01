@@ -2,12 +2,10 @@ import { ethers } from 'ethers';
 import { sTaoData } from '../data/ethData';
 import EthersTestUtils from '../processors/EthersTestUtils';
 import testSigners from '../data/testWallets';
-import batchQueriedEvents from '../utils/etherEventBatcher';
 import { ApiPromise, WsProvider } from '@polkadot/api';
 import BittensorTestUtils from '../processors/BittensorTestUtils';
 import ethWallets from '../data/testWallets';
 import { _0n, stringToU8a, u8aToHex, u8aToString } from '@polkadot/util';
-import KeyringUtils from '../utils/KeyringUtils';
 import { Keyring } from '@polkadot/keyring';
 // important this needs to be done before any `@polkadot/util-crypto` operations
 //import '@polkadot/wasm-crypto/initWasmAsm';
@@ -22,15 +20,11 @@ async function main() {
     apiTemp,
     wsProviderTemp,
     keyringTemp,
-    10
   );
 
-  const keyringUtils = new KeyringUtils(keyringTemp, 10);
 
   const ethersClass = new EthersTestUtils();
 
-  const keyringPairs = keyringUtils.keyringPairs;
-  const keyringAddress = keyringUtils.keyringAddresses;
   const etherWallets = ethersClass.signers;
   const key = keyringTemp.addFromUri('//Owner');
   console.log(key.address);

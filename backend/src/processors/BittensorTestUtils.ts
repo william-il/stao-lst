@@ -6,10 +6,8 @@ import '@polkadot/types-augment/lookup';
 import '@polkadot/types-augment/registry'; */
 import { ApiPromise, WsProvider } from '@polkadot/api';
 import { Keyring } from '@polkadot/keyring';
-import { decorateConstants } from '@polkadot/types';
 import { stringToU8a, u8aToHex } from '@polkadot/util';
 import { signatureVerify } from '@polkadot/util-crypto';
-import bitData from '../data/bitData';
 import dotenv from 'dotenv';
 
 import '@polkadot/keyring';
@@ -29,11 +27,8 @@ import {
   ExtrinsicStatus,
 } from '@polkadot/types/interfaces';
 import { KeyringPair } from '@polkadot/keyring/types';
-import coldKeys, { hotKeys } from '../data/bittensorTestWallets';
 import EthKey from '../types/EthKey';
 import { EventEmitter } from 'events';
-import { ethers } from 'ethers';
-import 'tx2';
 import logger from '../utils/logger';
 import HotKeyPortfolio from '../types/HotkeyPortfolio';
 import { rebalanceTransactionMap } from './FinanceUtils';
@@ -313,15 +308,6 @@ export default class BittensorTestUtils {
   public async getCurrentHotKeyPortfolio(
     vaultKeyringOrAddress: KeyringPair | string = this.keyringMap.get('Vault')!
   ) {
-    /*
-    export interface HotkeyPortfolio {
-      [name: string]: {
-        hotKey: string;
-        weight: Decimal;
-        taoAmount: bigint;
-      };
-    } */
-
     // parse the hotkey portfolio to an address:
     let vaultAddress;
     if (typeof vaultKeyringOrAddress === 'string') {
@@ -459,13 +445,6 @@ export default class BittensorTestUtils {
     stakeTransactionMap: rebalanceTransactionMap,
     shouldReadEvents: boolean = false
   ) {
-    /* export interface rebalanceTransactionMap {
-  [name: string]: {
-    hotKey: string;
-    taoAmount: bigint;
-    type: 'stake' | 'unstake' | 'none';
-  }; */
-
     const batchTx = new Promise(async (resolve, reject) => {
       this.logger.info('Starting Batch Staking/Unstaking Request', {
         functionName: 'batchStakingUnstakingRequest',
@@ -738,7 +717,7 @@ export default class BittensorTestUtils {
     );
     const nonce = await this.getNextNonce(sender);
     const info = await transferTx.paymentInfo(sender, { nonce });
-    console.log('\nPayment Info: ', info.toHuman().partialFee);
+    console.log('Singular Transfer Fee Info: ', info.toHuman().partialFee);
   }
 
   public async sendTransactionSecure(
@@ -866,43 +845,6 @@ export default class BittensorTestUtils {
             resolve,
             reject
           );
-          /* if (status.isInBlock) {
-            if (shouldReadEvents) {
-              console.log(
-                `Start staking request to ${recipient}, amt: ${this.formatHumanReadableNumber(amount.toString())}`
-              );
-              console.log(
-                `Transaction included at blockHash ${status.asInBlock}`
-              );
-            }
-          } else if (status.isFinalized) {
-            if (shouldReadEvents) {
-              console.log(
-                `Transaction finalized at blockHash ${status.asFinalized}`
-              );
-            }
-
-            if (shouldReadEvents) {
-              events.forEach(({ event }) => {
-                console.log(
-                  `\t${event.section}.${event.method}:: ${event.data}`
-                );
-                //console.log(event.toHuman());
-              });
-            }
-            this.logger.info(
-              'Completed Removing Stake Securely From Tao Wallet',
-              {
-                functionName: 'removeStakeSecure',
-                senderAddress: sender.address,
-                recipientAddress: recipient,
-                amountSent: amount,
-                finalizedBlockHash: status.asFinalized,
-              }
-            );
-            this.logger.logger.profile('removeStakeSecure');
-            resolve();
-          } */
         })
         .catch(reject);
     });
@@ -1110,7 +1052,7 @@ export default class BittensorTestUtils {
       );
     } else if (shouldPrint) {
       console.log(
-        `Account: ${account} has balances of:, `,
+        `Account: ${account} has balances of: `,
         accountData.toHuman()
       );
     }
@@ -1148,6 +1090,10 @@ export default class BittensorTestUtils {
     return unsubscribe;
   }
 
+  /***
+   * Deprecated block subscription.
+   * Should only be used if you wanto use block subscription to look for a different event
+   */
   public async blockSubscription() {
     const blockHash = await this.api.rpc.chain.subscribeFinalizedHeads(
       async (finalizedHeader) => {
