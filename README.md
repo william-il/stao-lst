@@ -120,3 +120,9 @@ To see root weights set by validators
 btcli root get_weights --subtensor.chain_endpoint ws://127.0.0.1:9946
 ```
 
+## Running on Testnet or Mainnet
+To run on mainnet or testnet we need to change a few things:
+- The API Key for ethers must be updated to be your ethereum RPC node
+- The websocket API for bittensor must be updated to be your bittensor archive node
+- the 'server' processor must be updated accordingly based on timings of the testnet or the mainnet for bittensor
+
